@@ -49,3 +49,39 @@ export function callWasm(input) {
 export function setAtomic(value) {
   Atomics.store(stop, 0, value);
 }
+
+// handle input and Enter key
+const inputField = document.getElementById("input");
+const outputDiv = document.getElementById("output");
+const runButton = document.getElementById("run");
+
+async function runCurrentInput() {
+  const text = inputField.value.trim();
+  if (!text) return;
+
+  inputField.value = ""; // clear input
+  outputDiv.textContent = "Processing…";
+
+  try {
+    const result = await callWasm(text);
+    outputDiv.textContent = result;
+  } catch (err) {
+    outputDiv.textContent = `Error: ${err}`;
+  }
+}
+
+// bind both button click and Enter key
+runButton.addEventListener("click", runCurrentInput);
+
+inputField.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    runCurrentInput();
+  }
+});
+
+// optional: cancel computation with Escape
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    setAtomic(1);
+  }
+});
