@@ -3,8 +3,7 @@ import init, { stop_ptr } from "./pkg/stream_wasm.js";
 let worker;
 let stop;
 
-let pending = new Map();
-let nextId = 1;
+let pending = null;
 
 async function start() {
   const wasm = await init();
@@ -20,29 +19,24 @@ async function start() {
   worker = new Worker("./worker.js", { type: "module" });
 
   worker.onmessage = (e) => {
-    const { id, result } = e.data;
+    const { result } = e.data;
 
-    const resolve = pending.get(id);
-    pending.delete(id);
-
-    resolve(result);
+    if (pending) {
+      const { resolve } = pending;
+      pending = null;
+      resolve(result);
+    }
   };
 }
 
 await start();
 
 export function callWasm(input) {
+  if (pending) throw new Error("Call already in progress");
+
   return new Promise((resolve) => {
-
-    const id = nextId++;
-
-    pending.set(id, resolve);
-
-    worker.postMessage({
-      id,
-      input
-    });
-
+    pending = { resolve };
+    worker.postMessage({ input });
   });
 }
 
@@ -55,14 +49,14 @@ const inputField = document.getElementById("input");
 const outputDiv = document.getElementById("output");
 const runButton = document.getElementById("run");
 
-// history
+// History
 const history = [];
 let historyIndex = -1; // -1 means new input
 let savedPartial = ""; // partially typed input when navigating
 
 async function runCurrentInput() {
   const text = inputField.value.trim();
-  if (!text) return;
+  if (!text || pending) return; // block if busy
 
   // Add to history if different from last
   if (history.length === 0 || history[history.length - 1] !== text) {
@@ -73,14 +67,19 @@ async function runCurrentInput() {
   historyIndex = -1;     // reset navigation
   savedPartial = "";
 
-  outputDiv.textContent = "Processing…";
-
+  appendLine(`> ${text}`);
   try {
     const result = await callWasm(text);
-    outputDiv.textContent = result;
+    appendLine(result);
   } catch (err) {
-    outputDiv.textContent = `Error: ${err}`;
+    appendLine(`Error: ${err}`);
   }
+}
+
+// append a line to the output div
+function appendLine(line) {
+  outputDiv.textContent += line + "\n";
+  outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
 // Bind run button
