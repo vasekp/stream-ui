@@ -38,6 +38,22 @@ const inputField = document.getElementById("input");
 const outputDiv = document.getElementById("output");
 const runButton = document.getElementById("run");
 
+// keep original handler for reuse
+function runButtonHandler(e) {
+  runCurrentInput();
+}
+
+// helper to toggle button state with one class; stop action immediate
+function setRunButtonBusy(busy) {
+  if (busy) {
+    runButton.onclick = () => stop();
+    runButton.classList.add("busy");
+  } else {
+    runButton.classList.remove("busy");
+    runButton.onclick = runButtonHandler;
+  }
+}
+
 // History
 const history = [];
 let historyIndex = -1;
@@ -85,12 +101,15 @@ async function runCurrentInput() {
   updateRunButton();
 
   appendLine(text, "input");
+  setRunButtonBusy(true);
   try {
     const result = await callWasm(text);
     outputCount += 1;
     appendLine(result, "output", outputCount);
   } catch (err) {
     appendLine(`Error: ${err}`, "error");
+  } finally {
+    setRunButtonBusy(false);
   }
 }
 

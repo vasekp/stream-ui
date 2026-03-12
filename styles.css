@@ -7,6 +7,24 @@
   overflow-y: auto;
 }
 
+#run {
+  width: 4ch;
+  position: relative;
+  font-size: 1rem;
+}
+
+#run::after {
+  content: "\25B6"; /* ▶ play symbol */
+}
+
+@keyframes runToStop {
+  to { content: "\25A0"; } /* ■ */
+}
+
+#run.busy::after {
+  animation: runToStop 0s 0.1s forwards;
+}
+
 .input {
   font-weight: bold;
   background: #8881; /* very transparent grey */
