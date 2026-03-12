@@ -78,11 +78,11 @@ function appendLine(line, className, dataNum) {
 
 // Validate input and enable/disable Run
 function updateRunButton() {
-  try {
+  /*try {
     runButton.disabled = !validate(inputField.value);
   } catch {
     runButton.disabled = true; // fail-safe
-  }
+  }*/
 }
 
 // Linear run handler
