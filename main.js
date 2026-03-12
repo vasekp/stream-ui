@@ -43,11 +43,17 @@ const history = [];
 let historyIndex = -1;
 let savedPartial = "";
 
-// helper to append a line as a new div, with optional class
-function appendLine(line, className) {
+// count of outputs we have added (used for data-num)
+let outputCount = 0;
+
+// helper to append a line as a new div, with optional class and data-num
+function appendLine(line, className, dataNum) {
   const lineDiv = document.createElement("div");
   if (className) {
     lineDiv.className = className;
+  }
+  if (dataNum !== undefined && dataNum !== null) {
+    lineDiv.dataset.num = dataNum;
   }
   lineDiv.textContent = line;
   outputDiv.appendChild(lineDiv);
@@ -78,10 +84,11 @@ async function runCurrentInput() {
   savedPartial = "";
   updateRunButton();
 
-  appendLine(`> ${text}`, "input");
+  appendLine(text, "input");
   try {
     const result = await callWasm(text);
-    appendLine(result, "output");
+    outputCount += 1;
+    appendLine(result, "output", outputCount);
   } catch (err) {
     appendLine(`Error: ${err}`, "error");
   }

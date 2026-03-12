@@ -8,11 +8,26 @@
 }
 
 .input {
-  font-style: italic;
+  font-weight: bold;
+  background: #8881; /* very transparent grey */
+}
+
+.input::before {
+  content: "> ";
+  font-weight: normal;
+  user-select: none;
+  display: inline-block;
 }
 
 .output {
   /* normal styling */
+}
+
+.output::before {
+  content: "%" attr(data-num) ": ";
+  opacity: 0.5;
+  user-select: none;
+  display: inline-block;
 }
 
 .error {
