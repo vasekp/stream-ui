@@ -1,22 +1,15 @@
-import init, { stop_ptr, validate } from "./pkg/stream_wasm.js";
+import init, { stop, validate } from "./pkg/stream_wasm.js";
 
 let worker;
-let stop;
 
 let pending = null;
 
 async function start() {
   const wasm = await init();
 
-  const ptr = stop_ptr();
-
-  stop = new Int32Array(
-    wasm.memory.buffer,
-    ptr,
-    1
-  );
-
   worker = new Worker("./worker.js", { type: "module" });
+
+  worker.postMessage({ type: "init", memory: wasm.memory });
 
   worker.onmessage = (e) => {
     const { result } = e.data;
@@ -38,10 +31,6 @@ export function callWasm(input) {
     pending = { resolve };
     worker.postMessage({ input });
   });
-}
-
-export function setAtomic(value) {
-  Atomics.store(stop, 0, value);
 }
 
 // DOM references
@@ -139,7 +128,7 @@ inputField.addEventListener("keydown", (e) => {
 // optional: cancel computation with Escape
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    setAtomic(1);
+    stop();
   }
 });
 

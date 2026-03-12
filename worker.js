@@ -1,19 +1,21 @@
 import init, { process } from "./pkg/stream_wasm.js";
 
-await init();
-
 let busy = false;
 
-self.onmessage = (e) => {
-  const { input } = e.data;
+self.onmessage = async (e) => {
+  if (e.data.type === "init") {
+    await init(undefined, e.data.memory);
+  } else {
+    const { input } = e.data;
 
-  if (busy) return; // ignore concurrent calls
-  busy = true;
+    if (busy) return; // ignore concurrent calls
+    busy = true;
 
-  try {
-    const result = process(input);
-    self.postMessage({ result });
-  } finally {
-    busy = false;
+    try {
+      const result = process(input);
+      self.postMessage({ result });
+    } finally {
+      busy = false;
+    }
   }
 };
