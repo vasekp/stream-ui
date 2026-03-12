@@ -43,9 +43,14 @@ const history = [];
 let historyIndex = -1;
 let savedPartial = "";
 
-// helper to append a line
-function appendLine(line) {
-  outputDiv.textContent += line + "\n";
+// helper to append a line as a new div, with optional class
+function appendLine(line, className) {
+  const lineDiv = document.createElement("div");
+  if (className) {
+    lineDiv.className = className;
+  }
+  lineDiv.textContent = line;
+  outputDiv.appendChild(lineDiv);
   outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
@@ -73,12 +78,12 @@ async function runCurrentInput() {
   savedPartial = "";
   updateRunButton();
 
-  appendLine(`> ${text}`);
+  appendLine(`> ${text}`, "input");
   try {
     const result = await callWasm(text);
-    appendLine(result);
+    appendLine(result, "output");
   } catch (err) {
-    appendLine(`Error: ${err}`);
+    appendLine(`Error: ${err}`, "error");
   }
 }
 

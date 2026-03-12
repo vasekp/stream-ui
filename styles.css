@@ -1,0 +1,20 @@
+#output {
+  white-space: pre-wrap;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  padding: 8px;
+  height: 300px;
+  overflow-y: auto;
+}
+
+.input {
+  font-style: italic;
+}
+
+.output {
+  /* normal styling */
+}
+
+.error {
+  color: red;
+}
