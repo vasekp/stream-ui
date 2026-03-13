@@ -76,8 +76,15 @@ function appendLine(line, className, dataNum) {
   outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
+// Resize textarea to fit content up to max lines
+function resizeInput() {
+  inputField.style.height = "auto";
+  inputField.style.height = `${inputField.scrollHeight}px`;
+}
+
 // Validate input and enable/disable Run
 function updateRunButton() {
+  resizeInput();
   /*try {
     runButton.disabled = !validate(inputField.value);
   } catch {
@@ -119,15 +126,21 @@ runButton.addEventListener("click", runCurrentInput);
 // Input events
 inputField.addEventListener("input", updateRunButton);
 
+// ensure initial height
+resizeInput();
+
 inputField.addEventListener("keydown", (e) => {
   const lastIndex = history.length - 1;
 
-  if (e.key === "Enter") {
+  if (e.key === "Enter" && !e.shiftKey) {
     if (!runButton.disabled) {
       runCurrentInput();
     }
     e.preventDefault();
-  } else if (e.key === "ArrowUp") {
+    return;
+  }
+
+  if (e.key === "ArrowUp") {
     e.preventDefault();
     if (history.length === 0) return;
 
