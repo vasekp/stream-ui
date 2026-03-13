@@ -163,5 +163,18 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// clicking a past input line should recall it
+outputDiv.addEventListener("click", (e) => {
+  const target = e.target;
+  if (target.classList && target.classList.contains("input")) {
+    inputField.value = target.textContent;
+    updateRunButton();
+    inputField.focus();
+    // put cursor at end
+    const len = inputField.value.length;
+    inputField.setSelectionRange(len, len);
+  }
+});
+
 // initialize Run button state
 updateRunButton();
