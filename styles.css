@@ -24,6 +24,8 @@
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease;
+  overflow-y: auto;
+  font-family: monospace;
 }
 
 #detail-panel.panel-hidden {
@@ -32,10 +34,7 @@
 }
 
 #detail-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
   padding: 8px;
-  font-family: monospace;
   white-space: pre-wrap;
   counter-reset: item-counter;
 }

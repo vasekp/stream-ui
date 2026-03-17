@@ -78,24 +78,31 @@ let currentIteratorNum = null;
 let generatorExhausted = false;
 let isLoadingMore = false;
 let pendingIteratorRequest = null;
-let intersectionObserver = null;
 let sentinelVisible = false; // track sentinel visibility
+let intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.target === sentinelElement) {
+          sentinelVisible = entry.isIntersecting;
+          if (sentinelVisible) {
+            loadMoreItems();
+          }
+        }
+      });
+    });
+sentinelElement.onclick = () => stop();
 
 // Open detail panel with iterator from worker
 function openDetailPanel(dataNum) {
   currentIteratorNum = dataNum;
   generatorExhausted = false;
   isLoadingMore = false;
-  sentinelVisible = false; // reset flag
   
   // Remove all children except sentinel
-  while (detailList.firstChild && detailList.firstChild !== sentinelElement) {
-    detailList.removeChild(detailList.firstChild);
-  }
+  detailList.replaceChildren();
   
   // Show sentinel
-  sentinelElement.onclick = () => stop();
-  sentinelElement.style.display = "block";
+  sentinelElement.hidden = false;
+  sentinelVisible = true;
   
   // Show panel
   detailPanel.classList.remove("panel-hidden");
@@ -107,19 +114,6 @@ function openDetailPanel(dataNum) {
   worker.postMessage({ type: "get_iter", num: dataNum });
   
   // Set up intersection observer
-  if (!intersectionObserver) {
-    intersectionObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.target === sentinelElement) {
-          sentinelVisible = entry.isIntersecting;
-          if (sentinelVisible) {
-            loadMoreItems();
-          }
-        }
-      });
-    }, { root: detailList });
-  }
-  
   intersectionObserver.observe(sentinelElement);
   
   // Load initial item
@@ -131,22 +125,20 @@ function closeDetailPanel() {
   detailPanel.classList.add("panel-hidden");
   generatorExhausted = true; // prevent further responses from being processed
   currentIteratorNum = null;
-  sentinelVisible = false; // reset flag
+  sentinelVisible = false;
   
   // Remove all children except sentinel
-  while (detailList.firstChild && detailList.firstChild !== sentinelElement) {
-    detailList.removeChild(detailList.firstChild);
-  }
+  detailList.replaceChildren();
   
   removeOverlay();
   
   // Unobserve sentinel
-  if (intersectionObserver) {
-    intersectionObserver.unobserve(sentinelElement);
+  intersectionObserver.unobserve(sentinelElement);
+
+  if (isLoadingMore) {
+    stop(); // stop any pending generator processing
   }
   
-  // Stop computation and free iterator
-  stop();
   worker.postMessage({ type: "iter_free" });
 }
 
@@ -167,7 +159,7 @@ function loadMoreItems() {
     if (iterResult.done) {
       generatorExhausted = true;
       isLoadingMore = false;
-      sentinelElement.style.display = "none"; // hide when finished
+      sentinelElement.hidden = true;
       return;
     }
     
@@ -178,16 +170,16 @@ function loadMoreItems() {
       itemDiv.className = "item";
       itemDiv.textContent = value.value;
     } else if (value.type === "error") {
-      itemDiv.className = "item error";
+      itemDiv.className = "error";
       itemDiv.textContent = value.text;
       generatorExhausted = true; // stop on error, don't process further responses
       isLoadingMore = false;
-      detailList.insertBefore(itemDiv, sentinelElement);
-      sentinelElement.style.display = "none"; // hide sentinel on error
+      detailList.append(itemDiv);
+      sentinelElement.hidden = true;
       return;
     }
     
-    detailList.insertBefore(itemDiv, sentinelElement);
+    detailList.append(itemDiv);
     isLoadingMore = false;
     
     // If sentinel is visible, load another item
