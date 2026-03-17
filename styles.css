@@ -128,7 +128,7 @@ body {
   /* normal styling */
 }
 
-.output::before {
+.output[data-num]::before {
   content: "%" attr(data-num) ": ";
   opacity: 0.5;
   user-select: none;

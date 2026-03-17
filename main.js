@@ -160,13 +160,16 @@ function removeOverlay() {
   }
 }
 
-function appendLine(line, className, dataNum) {
+function appendLine(line, className, dataNum, itemType) {
   const lineDiv = document.createElement("div");
   if (className) {
     lineDiv.className = className;
   }
   if (dataNum !== undefined && dataNum !== null) {
     lineDiv.dataset.num = dataNum;
+  }
+  if (itemType !== undefined && itemType !== null) {
+    lineDiv.dataset.itemType = itemType;
   }
   lineDiv.textContent = line;
   outputDiv.appendChild(lineDiv);
@@ -208,8 +211,14 @@ async function runCurrentInput() {
   setRunButtonBusy(true);
   try {
     const result = await callWasm(text);
-    outputCount += 1;
-    appendLine(result, "output", outputCount);
+    
+    if (result.type === "item") {
+      appendLine(result.value, "output", result.history, result.itemType);
+    } else if (result.type === "globals") {
+      appendLine(result.value, "output");
+    } else if (result.type === "error") {
+      appendLine(result.text, "error");
+    }
   } catch (err) {
     appendLine(`Error: ${err}`, "error");
   } finally {
@@ -287,9 +296,11 @@ outputDiv.addEventListener("click", (e) => {
     return;
   }
   
-  // output items open detail panel
+  // output items open detail panel only if itemType is "stream"
   if (target.classList && target.classList.contains("output")) {
-    openDetailPanel(mockGenerator());
+    if (target.dataset.itemType === "stream") {
+      openDetailPanel(mockGenerator());
+    }
     return;
   }
   
