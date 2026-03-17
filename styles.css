@@ -138,6 +138,10 @@ body {
   /* normal styling */
 }
 
+.err-suffix {
+  color: red;
+}
+
 .output[data-num]::before {
   content: "%" attr(data-num) ": ";
   opacity: 0.5;

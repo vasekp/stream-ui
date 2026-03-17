@@ -3,6 +3,7 @@ import init, { stop, validate } from "./pkg/stream_wasm.js";
 let worker;
 
 let pending = null;
+const ERR_SUFFIX = "<!>";
 
 async function start() {
   const wasm = await init();
@@ -165,7 +166,7 @@ function loadMoreItems() {
     
     if (value.type === "item") {
       itemDiv.className = "item";
-      itemDiv.textContent = value.value;
+      setLineContent(itemDiv, value.value, true);
     } else if (value.type === "error") {
       // Create error with backtrace in detail panel
       const errorDiv = document.createElement("div");
@@ -239,6 +240,25 @@ function removeOverlay() {
   }
 }
 
+function setLineContent(element, line, highlightErrSuffix = false) {
+  if (
+    highlightErrSuffix &&
+    typeof line === "string" &&
+    line.endsWith(ERR_SUFFIX)
+  ) {
+    const base = line.slice(0, -ERR_SUFFIX.length);
+    element.append(document.createTextNode(base));
+
+    const suffixSpan = document.createElement("span");
+    suffixSpan.className = "err-suffix";
+    suffixSpan.textContent = ERR_SUFFIX;
+    element.append(suffixSpan);
+    return;
+  }
+
+  element.textContent = line;
+}
+
 function appendLine(line, className, dataNum, itemType) {
   const lineDiv = document.createElement("div");
   if (className) {
@@ -250,7 +270,8 @@ function appendLine(line, className, dataNum, itemType) {
   if (itemType !== undefined && itemType !== null) {
     lineDiv.dataset.itemType = itemType;
   }
-  lineDiv.textContent = line;
+  let highlightErrSuffix = className === "output";
+  setLineContent(lineDiv, line, highlightErrSuffix);
   outputDiv.appendChild(lineDiv);
   outputDiv.scrollTop = outputDiv.scrollHeight;
 }
