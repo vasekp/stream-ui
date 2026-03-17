@@ -145,6 +145,36 @@ body {
   display: inline-block;
 }
 
+.output[data-item-type="stream"] {
+  cursor: pointer;
+}
+
 .error {
   color: red;
+}
+
+.error-toggle {
+  display: none; /* hide the checkbox itself */
+}
+
+.error-label {
+  cursor: pointer;
+  display: block;
+  user-select: none;
+}
+
+.error-trace {
+  display: none; /* hidden by default */
+}
+
+.error-trace-line {
+  opacity: 0.7;
+  font-size: 0.9em;
+  padding: 2px 0;
+  padding-left: 1em;
+}
+
+/* When checkbox is checked, show the trace */
+.error-toggle:checked ~ .error-trace {
+  display: block;
 }

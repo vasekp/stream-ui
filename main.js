@@ -47,7 +47,7 @@ const outputDiv = document.getElementById("output");
 const runButton = document.getElementById("run");
 
 // keep original handler for reuse
-function runButtonHandler(e) {
+function runButtonHandler() {
   runCurrentInput();
 }
 
@@ -66,9 +66,6 @@ function setRunButtonBusy(busy) {
 const history = [];
 let historyIndex = -1;
 let savedPartial = "";
-
-// count of outputs we have added (used for data-num)
-let outputCount = 0;
 
 // Detail panel infinite scroll
 const detailPanel = document.getElementById("detail-panel");
@@ -170,11 +167,44 @@ function loadMoreItems() {
       itemDiv.className = "item";
       itemDiv.textContent = value.value;
     } else if (value.type === "error") {
-      itemDiv.className = "error";
-      itemDiv.textContent = value.text;
+      // Create error with backtrace in detail panel
+      const errorDiv = document.createElement("div");
+      errorDiv.className = "error";
+      
+      // Create label that wraps all content
+      const label = document.createElement("label");
+      label.className = "error-label";
+      
+      // Create hidden checkbox inside label for implicit association
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "error-toggle";
+      label.appendChild(checkbox);
+      
+      // Add backtrace if present
+      if (value.trace && Array.isArray(value.trace) && value.trace.length > 0) {
+        const traceDiv = document.createElement("div");
+        traceDiv.className = "error-trace";
+        value.trace.forEach((line) => {
+          const traceLine = document.createElement("div");
+          traceLine.className = "error-trace-line";
+          traceLine.textContent = line;
+          traceDiv.appendChild(traceLine);
+        });
+        label.appendChild(traceDiv);
+      }
+      
+      // Add error message
+      const messageDiv = document.createElement("div");
+      messageDiv.className = "error-message";
+      messageDiv.textContent = value.text;
+      label.appendChild(messageDiv);
+      
+      errorDiv.appendChild(label);
+      
       generatorExhausted = true; // stop on error, don't process further responses
       isLoadingMore = false;
-      detailList.append(itemDiv);
+      detailList.append(errorDiv);
       sentinelElement.hidden = true;
       return;
     }
@@ -225,6 +255,46 @@ function appendLine(line, className, dataNum, itemType) {
   outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
+// Append error with collapsible backtrace
+function appendError(errorText, backtrace) {
+  const errorDiv = document.createElement("div");
+  errorDiv.className = "error";
+  
+  // Create label that wraps all content
+  const label = document.createElement("label");
+  label.className = "error-label";
+  
+  // Create hidden checkbox inside label for implicit association
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "error-toggle";
+  label.appendChild(checkbox);
+  
+  // Add backtrace if present
+  if (backtrace && Array.isArray(backtrace) && backtrace.length > 0) {
+    const traceDiv = document.createElement("div");
+    traceDiv.className = "error-trace";
+    backtrace.forEach((line) => {
+      const traceLine = document.createElement("div");
+      traceLine.className = "error-trace-line";
+      traceLine.textContent = line;
+      traceDiv.appendChild(traceLine);
+    });
+    label.appendChild(traceDiv);
+  }
+  
+  // Add error message
+  const messageDiv = document.createElement("div");
+  messageDiv.className = "error-message";
+  messageDiv.textContent = errorText;
+  label.appendChild(messageDiv);
+  
+  errorDiv.appendChild(label);
+  
+  outputDiv.appendChild(errorDiv);
+  outputDiv.scrollTop = outputDiv.scrollHeight;
+}
+
 // Resize textarea to fit content up to max lines
 function resizeInput() {
   inputField.style.height = "auto";
@@ -266,10 +336,10 @@ async function runCurrentInput() {
     } else if (result.type === "globals") {
       appendLine(result.value, "output");
     } else if (result.type === "error") {
-      appendLine(result.text, "error");
+      appendError(result.text, result.trace);
     }
   } catch (err) {
-    appendLine(`Error: ${err}`, "error");
+    appendError(`Error: ${err}`, null);
   } finally {
     setRunButtonBusy(false);
   }
@@ -350,12 +420,6 @@ outputDiv.addEventListener("click", (e) => {
     if (target.dataset.itemType === "stream") {
       openDetailPanel(target.dataset.num);
     }
-    return;
-  }
-  
-  // error items open detail panel
-  if (target.classList && target.classList.contains("error")) {
-    openDetailPanel(mockGenerator());
     return;
   }
 });
