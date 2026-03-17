@@ -11,6 +11,63 @@
   justify-content: flex-end; /* keep latest lines at bottom */
 }
 
+/* detail panel for infinite scroll items */
+#detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: calc(100% - 1in);
+  height: 100%;
+  background: white;
+  border-left: 1px solid #ccc;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+#detail-panel.panel-hidden {
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+#detail-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  counter-reset: item-counter;
+}
+
+#detail-panel .item {
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+#detail-panel .item::before {
+  content: "[" counter(item-counter) "] ";
+  counter-increment: item-counter;
+  opacity: 0.5;
+  user-select: none;
+  display: inline-block;
+}
+
+/* overlay to close panel on outside click */
+#detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: calc(100% - 1in);
+  height: 100%;
+  z-index: 99;
+  display: none;
+}
+
+#detail-overlay.panel-active {
+  display: block;
+}
+
 #controls {
   display: flex;
   padding: 8px;

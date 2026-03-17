@@ -62,7 +62,104 @@ let savedPartial = "";
 // count of outputs we have added (used for data-num)
 let outputCount = 0;
 
-// helper to append a line as a new div, with optional class and data-num
+// Detail panel infinite scroll
+const detailPanel = document.getElementById("detail-panel");
+const detailList = document.getElementById("detail-list");
+let currentGenerator = null;
+let generatorExhausted = false;
+let isLoadingMore = false;
+
+// Mock generator function (will be replaced with real data from clicked output)
+function* mockGenerator() {
+  let count = 0;
+  while (true) {
+    yield `Item ${count++}`;
+    if (count > 1000) break; // prevent truly infinite for testing
+  }
+}
+
+// Open detail panel with generator
+function openDetailPanel(generator) {
+  currentGenerator = generator;
+  generatorExhausted = false;
+  isLoadingMore = false;
+  
+  // Clear list
+  detailList.innerHTML = "";
+  
+  // Show panel
+  detailPanel.classList.remove("panel-hidden");
+  
+  // Create overlay
+  createOverlay();
+  
+  // Load initial batch
+  loadMoreItems();
+}
+
+// Close detail panel
+function closeDetailPanel() {
+  detailPanel.classList.add("panel-hidden");
+  currentGenerator = null;
+  detailList.innerHTML = "";
+  removeOverlay();
+}
+
+// Load more items from generator
+function loadMoreItems() {
+  if (!currentGenerator || generatorExhausted || isLoadingMore) return;
+  
+  isLoadingMore = true;
+  
+  // Load a batch of items (e.g., 20 at a time)
+  for (let i = 0; i < 20; i++) {
+    const result = currentGenerator.next();
+    
+    if (result.done) {
+      generatorExhausted = true;
+      break;
+    }
+    
+    const itemDiv = document.createElement("div");
+    itemDiv.className = "item";
+    itemDiv.textContent = result.value;
+    detailList.appendChild(itemDiv);
+  }
+  
+  isLoadingMore = false;
+}
+
+// Detect when scrolling near bottom to load more
+detailList.addEventListener("scroll", (e) => {
+  const element = e.target;
+  // Load more when within 100px of bottom
+  if (element.scrollHeight - element.scrollTop - element.clientHeight < 100) {
+    if (!generatorExhausted && !isLoadingMore) {
+      loadMoreItems();
+    }
+  }
+});
+
+// Create and attach overlay for closing
+function createOverlay() {
+  let overlay = document.getElementById("detail-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "detail-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add("panel-active");
+  overlay.onclick = closeDetailPanel;
+}
+
+function removeOverlay() {
+  const overlay = document.getElementById("detail-overlay");
+  if (overlay) {
+    overlay.classList.remove("panel-active");
+    overlay.onclick = null;
+  }
+}
+
 function appendLine(line, className, dataNum) {
   const lineDiv = document.createElement("div");
   if (className) {
@@ -176,16 +273,30 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// clicking a past input line should recall it
+// clicking a past output div should open detail panel
 outputDiv.addEventListener("click", (e) => {
   const target = e.target;
+  
+  // input items are clickable to recall
   if (target.classList && target.classList.contains("input")) {
     inputField.value = target.textContent;
     updateRunButton();
     inputField.focus();
-    // put cursor at end
     const len = inputField.value.length;
     inputField.setSelectionRange(len, len);
+    return;
+  }
+  
+  // output items open detail panel
+  if (target.classList && target.classList.contains("output")) {
+    openDetailPanel(mockGenerator());
+    return;
+  }
+  
+  // error items open detail panel
+  if (target.classList && target.classList.contains("error")) {
+    openDetailPanel(mockGenerator());
+    return;
   }
 });
 
