@@ -12,9 +12,17 @@ async function start() {
   worker.postMessage({ type: "init", memory: wasm.memory });
 
   worker.onmessage = (e) => {
-    const { result } = e.data;
-
-    if (pending) {
+    const { result, iterResult } = e.data;
+    
+    if (iterResult !== undefined) {
+      // Handle iterator result
+      if (pendingIteratorRequest) {
+        pendingIteratorRequest(iterResult);
+      }
+    }
+    
+    if (result !== undefined && pending) {
+      // Handle regular process result
       const { resolve } = pending;
       pending = null;
       resolve(result);
@@ -65,27 +73,29 @@ let outputCount = 0;
 // Detail panel infinite scroll
 const detailPanel = document.getElementById("detail-panel");
 const detailList = document.getElementById("detail-list");
-let currentGenerator = null;
+const sentinelElement = document.getElementById("detail-sentinel");
+let currentIteratorNum = null;
 let generatorExhausted = false;
 let isLoadingMore = false;
+let pendingIteratorRequest = null;
+let intersectionObserver = null;
+let sentinelVisible = false; // track sentinel visibility
 
-// Mock generator function (will be replaced with real data from clicked output)
-function* mockGenerator() {
-  let count = 0;
-  while (true) {
-    yield `Item ${count++}`;
-    if (count > 1000) break; // prevent truly infinite for testing
-  }
-}
-
-// Open detail panel with generator
-function openDetailPanel(generator) {
-  currentGenerator = generator;
+// Open detail panel with iterator from worker
+function openDetailPanel(dataNum) {
+  currentIteratorNum = dataNum;
   generatorExhausted = false;
   isLoadingMore = false;
+  sentinelVisible = false; // reset flag
   
-  // Clear list
-  detailList.innerHTML = "";
+  // Remove all children except sentinel
+  while (detailList.firstChild && detailList.firstChild !== sentinelElement) {
+    detailList.removeChild(detailList.firstChild);
+  }
+  
+  // Show sentinel
+  sentinelElement.onclick = () => stop();
+  sentinelElement.style.display = "block";
   
   // Show panel
   detailPanel.classList.remove("panel-hidden");
@@ -93,52 +103,99 @@ function openDetailPanel(generator) {
   // Create overlay
   createOverlay();
   
-  // Load initial batch
+  // Request iterator from worker
+  worker.postMessage({ type: "get_iter", num: dataNum });
+  
+  // Set up intersection observer
+  if (!intersectionObserver) {
+    intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.target === sentinelElement) {
+          sentinelVisible = entry.isIntersecting;
+          if (sentinelVisible) {
+            loadMoreItems();
+          }
+        }
+      });
+    }, { root: detailList });
+  }
+  
+  intersectionObserver.observe(sentinelElement);
+  
+  // Load initial item
   loadMoreItems();
 }
 
 // Close detail panel
 function closeDetailPanel() {
   detailPanel.classList.add("panel-hidden");
-  currentGenerator = null;
-  detailList.innerHTML = "";
+  generatorExhausted = true; // prevent further responses from being processed
+  currentIteratorNum = null;
+  sentinelVisible = false; // reset flag
+  
+  // Remove all children except sentinel
+  while (detailList.firstChild && detailList.firstChild !== sentinelElement) {
+    detailList.removeChild(detailList.firstChild);
+  }
+  
   removeOverlay();
+  
+  // Unobserve sentinel
+  if (intersectionObserver) {
+    intersectionObserver.unobserve(sentinelElement);
+  }
+  
+  // Stop computation and free iterator
+  stop();
+  worker.postMessage({ type: "iter_free" });
 }
 
-// Load more items from generator
+// Load more items from iterator via worker
 function loadMoreItems() {
-  if (!currentGenerator || generatorExhausted || isLoadingMore) return;
+  if (currentIteratorNum === null || generatorExhausted || isLoadingMore) return;
   
   isLoadingMore = true;
   
-  // Load a batch of items (e.g., 20 at a time)
-  for (let i = 0; i < 20; i++) {
-    const result = currentGenerator.next();
+  // Request a single item
+  worker.postMessage({ type: "iter_next" });
+  
+  // Store a pending callback for when response comes back
+  pendingIteratorRequest = (iterResult) => {
+    // Don't process responses if panel is closed or we've already hit an error
+    if (generatorExhausted || currentIteratorNum === null) return;
     
-    if (result.done) {
+    if (iterResult.done) {
       generatorExhausted = true;
-      break;
+      isLoadingMore = false;
+      sentinelElement.style.display = "none"; // hide when finished
+      return;
     }
     
+    const value = iterResult.value;
     const itemDiv = document.createElement("div");
-    itemDiv.className = "item";
-    itemDiv.textContent = result.value;
-    detailList.appendChild(itemDiv);
-  }
-  
-  isLoadingMore = false;
-}
-
-// Detect when scrolling near bottom to load more
-detailList.addEventListener("scroll", (e) => {
-  const element = e.target;
-  // Load more when within 100px of bottom
-  if (element.scrollHeight - element.scrollTop - element.clientHeight < 100) {
-    if (!generatorExhausted && !isLoadingMore) {
+    
+    if (value.type === "item") {
+      itemDiv.className = "item";
+      itemDiv.textContent = value.value;
+    } else if (value.type === "error") {
+      itemDiv.className = "item error";
+      itemDiv.textContent = value.text;
+      generatorExhausted = true; // stop on error, don't process further responses
+      isLoadingMore = false;
+      detailList.insertBefore(itemDiv, sentinelElement);
+      sentinelElement.style.display = "none"; // hide sentinel on error
+      return;
+    }
+    
+    detailList.insertBefore(itemDiv, sentinelElement);
+    isLoadingMore = false;
+    
+    // If sentinel is visible, load another item
+    if (sentinelVisible) {
       loadMoreItems();
     }
-  }
-});
+  };
+}
 
 // Create and attach overlay for closing
 function createOverlay() {
@@ -299,7 +356,7 @@ outputDiv.addEventListener("click", (e) => {
   // output items open detail panel only if itemType is "stream"
   if (target.classList && target.classList.contains("output")) {
     if (target.dataset.itemType === "stream") {
-      openDetailPanel(mockGenerator());
+      openDetailPanel(target.dataset.num);
     }
     return;
   }

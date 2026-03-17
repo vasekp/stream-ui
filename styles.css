@@ -45,6 +45,17 @@
   border-bottom: 1px solid #eee;
 }
 
+#detail-panel .sentinel.loading {
+  color: #999;
+  font-style: italic;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 #detail-panel .item::before {
   content: "[" counter(item-counter) "] ";
   counter-increment: item-counter;
