@@ -43,7 +43,8 @@ export function callWasm(input) {
 }
 
 // DOM references
-const inputField = document.getElementById("input");
+const inputField = document.getElementById("edit-real");
+const mirrorField = document.getElementById("edit-mirror");
 const outputDiv = document.getElementById("output");
 const runButton = document.getElementById("run");
 
@@ -62,11 +63,6 @@ function setRunButtonBusy(busy) {
     runButton.onclick = runButtonHandler;
   }
 }
-
-// History
-const history = [];
-let historyIndex = -1;
-let savedPartial = "";
 
 // Detail panel infinite scroll
 const detailPanel = document.getElementById("detail-panel");
@@ -316,36 +312,43 @@ function appendError(errorText, backtrace) {
   outputDiv.scrollTop = outputDiv.scrollHeight;
 }
 
-// Resize textarea to fit content up to max lines
-function resizeInput() {
-  inputField.style.height = "auto";
-  inputField.style.height = `${inputField.scrollHeight}px`;
+function resetInput(text) {
+  inputField.textContent = text;
+  inputField.focus();
+  const range = document.createRange();
+  const sel = window.getSelection();
+  range.selectNodeContents(inputField);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  updateInputMirror();
 }
 
-// Validate input and enable/disable Run
-function updateRunButton() {
-  resizeInput();
-  /*try {
-    runButton.disabled = !validate(inputField.value);
-  } catch {
-    runButton.disabled = true; // fail-safe
-  }*/
+function updateInputMirror() {
+  const check = validate(inputField.textContent);
+  let text = inputField.innerText;
+  if(check.range !== undefined) {
+    let [start, end] = check.range;
+    let mark = document.createElement('span');
+    mark.classList.add('error');
+    mark.textContent = text.substring(start, end);
+    mirrorField.replaceChildren();
+    mirrorField.append(text.substring(0, start));
+    mirrorField.append(mark);
+    mirrorField.append(text.substring(end));
+  } else {
+    mirrorField.textContent = text;
+  }
 }
 
 // Linear run handler
 async function runCurrentInput() {
-  const text = inputField.value.trim();
-  if (!text || pending || !validate(text)) return;
+  const text = inputField.textContent.trim();
+  if (!text || pending) return;
 
-  // store in history if not duplicate
-  if (history.length === 0 || history[history.length - 1] !== text) {
-    history.push(text);
+  if (validate(inputField.textContent).valid == true) {
+    resetInput("");
   }
-
-  inputField.value = "";
-  historyIndex = -1;
-  savedPartial = "";
-  updateRunButton();
 
   appendLine(text, "input");
   setRunButtonBusy(true);
@@ -370,48 +373,12 @@ async function runCurrentInput() {
 runButton.addEventListener("click", runCurrentInput);
 
 // Input events
-inputField.addEventListener("input", updateRunButton);
-
-// ensure initial height
-resizeInput();
+inputField.addEventListener("input", updateInputMirror);
 
 inputField.addEventListener("keydown", (e) => {
-  const lastIndex = history.length - 1;
-
   if (e.key === "Enter" && !e.shiftKey) {
-    if (!runButton.disabled) {
-      runCurrentInput();
-    }
+    runCurrentInput();
     e.preventDefault();
-    return;
-  }
-
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    if (history.length === 0) return;
-
-    if (historyIndex === -1) {
-      savedPartial = inputField.value;
-      historyIndex = lastIndex;
-    } else if (historyIndex > 0) {
-      historyIndex--;
-    }
-    inputField.value = history[historyIndex];
-    updateRunButton();
-  } else if (e.key === "ArrowDown") {
-    e.preventDefault();
-    if (history.length === 0) return;
-
-    if (historyIndex === -1) return;
-
-    historyIndex++;
-    if (historyIndex > lastIndex) {
-      historyIndex = -1;
-      inputField.value = savedPartial;
-    } else {
-      inputField.value = history[historyIndex];
-    }
-    updateRunButton();
   }
 });
 
@@ -427,17 +394,13 @@ outputDiv.addEventListener("click", (e) => {
   const target = e.target;
   
   // input items are clickable to recall
-  if (target.classList && target.classList.contains("input")) {
-    inputField.value = target.textContent;
-    updateRunButton();
-    inputField.focus();
-    const len = inputField.value.length;
-    inputField.setSelectionRange(len, len);
+  if (target.classList.contains("input")) {
+    resetInput(target.textContent);
     return;
   }
   
   // output items open detail panel only if itemType is "stream"
-  if (target.classList && target.classList.contains("output")) {
+  if (target.classList.contains("output")) {
     if (target.dataset.itemType === "stream") {
       openDetailPanel(target.dataset.num);
     }
@@ -445,5 +408,4 @@ outputDiv.addEventListener("click", (e) => {
   }
 });
 
-// initialize Run button state
-updateRunButton();
+inputField.focus();

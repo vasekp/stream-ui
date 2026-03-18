@@ -85,13 +85,47 @@
   background: #fafafa;
 }
 
-#controls textarea {
+#edit-parent {
   flex: 1 1 auto;
   resize: none;
   overflow-y: auto;
   line-height: 1.2em;
   max-height: calc(1.2em * 4);
+  position: relative;
+  border: 1px solid #ccc;
+  background: white;
+}
+
+#edit-parent div {
+  width: 100%;
+  height: auto;
+  white-space: pre;
+  text-wrap: auto;
+  overflow-wrap: anywhere;
   line-break: anywhere;
+  font-family: monospace;
+}
+
+#edit-real {
+  color: transparent;
+  caret-color: black;
+  cursor: text;
+}
+
+#edit-real:focus {
+  outline: none;
+}
+
+#edit-real::selection {
+  color: transparent;
+  background: rgba(0, 123, 255, 0.3);
+}
+
+#edit-mirror {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
 }
 
 html, body {
@@ -125,6 +159,7 @@ body {
 .input {
   font-weight: bold;
   background: #8881; /* very transparent grey */
+  line-break: anywhere;
 }
 
 .input::before {
@@ -135,7 +170,7 @@ body {
 }
 
 .output {
-  /* normal styling */
+  line-break: anywhere;
 }
 
 .err-suffix {
