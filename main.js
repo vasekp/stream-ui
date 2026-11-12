@@ -1,6 +1,6 @@
 // The language engine. It is loaded by start(), and loaded anew as a separate instance in the
 // rare case that the old one has to be abandoned: see resetSession().
-let stop, validate;
+let stop, validate, help;
 let instanceId = 0;
 // How long a reset waits for the worker to finish what it is doing before giving up on it.
 const RESET_PATIENCE_MS = 1500;
@@ -121,7 +121,7 @@ async function start() {
   // A query makes the module a separate instance, with a memory of its own.
   const engine = await import(instanceId === 0 ? "./pkg/stream_wasm.js" : `./pkg/stream_wasm.js?instance=${instanceId}`);
   const wasm = await engine.default();
-  ({ stop, validate } = engine);
+  ({ stop, validate, help } = engine);
   worker = new Worker("./worker.js?v=4", { type: "module" });
   worker.onmessage = (e) => {
     const { id, value, error, fatal, item } = e.data;
@@ -149,7 +149,7 @@ async function resetSession() {
 
   requestStop();
   setBusy(false);
-  closePager();
+  if (pager.mode !== "help") closePager(); // the reference does not depend on the session
   log.replaceChildren();
   welcome.hidden = false;
   setStatus();
@@ -207,7 +207,7 @@ function updateMirror() {
   const empty = text.trim() === "";
   mirror.toggleAttribute("data-empty", text === "" || text === "\n");
   let range;
-  if (ready && !lost && !empty) {
+  if (ready && !lost && !empty && !isHelpQuery(text)) {
     range = validate(text).range;
   }
   if (range) {
@@ -411,6 +411,20 @@ async function run(text) {
     return;
   }
 
+  if (isHelpQuery(text)) {
+    const name = helpName(text);
+    const doc = openReference(name);
+    if (doc.found) {
+      remember(text);
+      // Opening the panel takes the focus; give it back unless the panel covers the editor.
+      if (fromEditor) setEditor("", !pager.el.matches(":modal"));
+    } else {
+      const advice = doc.topic ? ` Did you mean ??${name}?` : "";
+      setStatus(`No documentation found for '${name}'.${advice}`, true);
+    }
+    return;
+  }
+
   const session = sessionId;
   if (!validate(text).valid) {
     // Ask the session for the reason, but keep the input for fixing and the transcript clean.
@@ -503,6 +517,8 @@ const pager = {
   sentinel: $("pager-sentinel"),
   status: $("pager-status"),
   stopButton: $("pager-stop"),
+  foot: $("pager-foot"),
+  mode: null, // what the panel shows while open: "stream" or "help"
   num: null,
   token: null, // identifies the listing that requests belong to
   count: 0,
@@ -521,6 +537,19 @@ function countText(n) {
   return n === 1 ? "1 item" : `${n} items`;
 }
 
+// The panel serves both the stream view and the reference; this switches its parts over.
+function setPanelMode(mode) {
+  const isHelp = mode === "help";
+  pager.mode = mode;
+  pager.list.hidden = isHelp;
+  pager.sentinel.hidden = isHelp;
+  pager.foot.hidden = isHelp;
+  reference.page.hidden = !isHelp;
+  reference.back.hidden = !isHelp;
+  $("pager-title").classList.remove("plain");
+  pager.body.setAttribute("aria-label", isHelp ? "Reference page" : "Stream items");
+}
+
 function showPager() {
   if (wideScreen.matches) {
     pager.el.show();
@@ -537,6 +566,8 @@ function openPager(num, text, opener) {
     return;
   }
   if (pager.token) releasePager();
+  leaveReference();
+  setPanelMode("stream");
   const token = (pager.token = {});
   pager.num = num;
   pager.count = 0;
@@ -575,6 +606,8 @@ function closePager() {
   if (pager.el.open) pager.el.close();
   workspace.classList.remove("has-pager");
   releasePager();
+  leaveReference();
+  pager.mode = null;
   pager.list.replaceChildren();
   const opener = pager.opener;
   pager.opener = null;
@@ -657,7 +690,7 @@ pager.stopButton.addEventListener("click", requestStop);
 
 // Esc on the modal sheet closes it natively; this catches that and any other way out.
 pager.el.addEventListener("close", () => {
-  if (!pager.el.open && pager.token) closePager();
+  if (!pager.el.open && pager.mode) closePager();
 });
 
 // A tap on the dimmed area beside the sheet closes it.
@@ -683,6 +716,142 @@ wideScreen.addEventListener("change", () => {
   workspace.classList.remove("has-pager");
   showPager();
 });
+
+// ---------- Reference ----------
+
+const reference = {
+  page: $("help-page"),
+  back: $("pager-back"),
+  trail: [], // the pages gone through, as { name, scroll }; the last one is on display
+};
+
+// An input starting with `?` asks for documentation instead of an evaluation.
+function isHelpQuery(text) {
+  return text.trimStart().startsWith("?");
+}
+
+// The page a query asks for: `?name` is a symbol, `??name` a page on the language (called
+// `?name` by the package) and a bare `?` or `??` the quick guide (the empty name).
+function helpName(text) {
+  const sym = text.trim().slice(1).trim();
+  if (!sym.startsWith("?")) return sym;
+  const topic = sym.slice(1).trimStart();
+  return topic === "" ? "" : `?${topic}`;
+}
+
+function refNode({ ref, text }, cls = "help-ref") {
+  const link = el("button", { type: "button", class: cls }, text);
+  link.dataset.help = ref;
+  return link;
+}
+
+// The nodes for a line of documentation. A `plain` line is program text as a whole, so its
+// parts are not marked up one by one.
+function lineNodes(parts, plain = false) {
+  return parts.flatMap(({ code, items }) => {
+    const nodes = items.map((item) => (typeof item === "string" ? item : refNode(item)));
+    return code && !plain ? [el("code", {}, ...nodes)] : nodes;
+  });
+}
+
+function helpSection(title, ...content) {
+  return el("section", {}, el("h3", {}, title), ...content);
+}
+
+function exampleNode(example, num) {
+  const input = el("code", {}, ...lineNodes(example.input, true));
+  if (example.comment) {
+    input.append(el("span", { class: "comment" }, " ; ", ...lineNodes(example.comment, true)));
+  }
+  const output = example.failed
+    ? el("div", { class: "out" }, failureNode(example.output))
+    : el("div", { class: "out" }, el("span", { class: "num" }, `%${num}`), valueNode(example.output));
+  return el("li", {},
+    el("div", { class: "in" }, el("span", { class: "prompt", "aria-hidden": "true" }, "›"), input),
+    output);
+}
+
+function renderReference(name, doc) {
+  const title = $("pager-title");
+  title.textContent = doc.title;
+  // Pages on the language have a title in words; the others are named by their symbol.
+  title.classList.toggle("plain", name === "" || name.startsWith("?"));
+  $("pager-source").textContent = doc.synonyms.length > 0 ? `Also: ${doc.synonyms.join(", ")}` : "";
+
+  const content = [];
+  if (doc.usage.length > 0) {
+    content.push(helpSection("Usage",
+      el("ul", { class: "usage" }, ...doc.usage.map((line) => el("li", {}, el("code", {}, ...lineNodes(line, true)))))));
+  }
+  content.push(el("section", {},
+    ...doc.desc.map(({ kind, line }) => el("p", { class: kind }, ...lineNodes(line)))));
+  if (doc.examples.length > 0) {
+    let num = 0;
+    content.push(helpSection("Examples",
+      el("ol", { class: "examples" },
+        ...doc.examples.map((example) => exampleNode(example, example.failed ? num : ++num)))));
+  }
+  if (doc.see.length > 0) {
+    content.push(helpSection("See also",
+      el("ul", { class: "see" }, ...doc.see.map((ref) => el("li", {}, refNode(ref, "row-btn ref"))))));
+  }
+  reference.page.replaceChildren(...content);
+  reference.back.disabled = reference.trail.length < 2;
+}
+
+// Shows the page `name` after the one on display, or as the first one with `restart`. Returns
+// what the package says about the name; if it knows no such page, nothing changes.
+function openReference(name, { restart = false, opener } = {}) {
+  if (!ready) return { found: false };
+  if (lost) {
+    setStatus(LOST_MESSAGE, true);
+    return { found: true };
+  }
+  const doc = help(name);
+  if (!doc.found) return doc;
+
+  if (pager.mode !== "help") {
+    if (pager.token) releasePager();
+    pager.list.replaceChildren();
+    pager.opener = opener ?? null;
+    setPanelMode("help");
+  }
+  if (restart) reference.trail = [];
+  const shown = reference.trail.at(-1);
+  if (shown) shown.scroll = pager.body.scrollTop;
+  reference.trail.push({ name, scroll: 0 });
+  renderReference(name, doc);
+  if (!pager.el.open) showPager();
+  pager.body.scrollTop = 0;
+  return doc;
+}
+
+function referenceBack() {
+  if (reference.trail.length < 2 || lost) return;
+  reference.trail.pop();
+  const { name, scroll } = reference.trail.at(-1);
+  renderReference(name, help(name));
+  pager.body.scrollTop = scroll;
+}
+
+function leaveReference() {
+  reference.trail = [];
+  reference.page.replaceChildren();
+}
+
+reference.page.addEventListener("click", (e) => {
+  const link = e.target.closest("[data-help]");
+  if (!link) return;
+  openReference(link.dataset.help);
+  pager.body.focus(); // the link is gone
+});
+
+reference.back.addEventListener("click", () => {
+  referenceBack();
+  if (reference.back.disabled) pager.body.focus();
+});
+
+$("help-open").addEventListener("click", (e) => openReference("", { restart: true, opener: e.currentTarget }));
 
 // ---------- Go ----------
 

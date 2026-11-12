@@ -676,6 +676,96 @@ ul, ol { padding: 0; list-style: none; }
   color: var(--text);
 }
 
+/* ---------- Reference ---------- */
+
+.pager-head:has(#pager-back:not([hidden])) { padding-left: 0.5rem; }
+
+.pager-titles h2.plain {
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.help {
+  padding: 0.75rem 1rem 1.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.help section + section { margin-top: 1.1rem; }
+
+.help h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.help p + p { margin-top: 0.3rem; }
+
+.help p code {
+  padding: 0.05em 0.3em;
+  border-radius: 0.3rem;
+  background: var(--surface-2);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+}
+
+.help p:is(.tip, .warn) {
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0.4rem 0.4rem 0;
+  background: var(--accent-soft);
+}
+
+.help p.warn {
+  border-left-color: var(--error);
+  background: var(--error-soft);
+}
+
+.help-ref {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.help-ref:hover { text-decoration-thickness: 2px; }
+
+.help :is(.usage, .examples) {
+  font-family: var(--font-code);
+  font-size: 0.875rem;
+}
+
+.help .usage code { white-space: pre-wrap; }
+
+.help .examples > li + li { margin-top: 0.15rem; }
+.help .examples :is(.in code, .val) { padding-block: 0.1rem; }
+.help .examples .in .prompt { padding-block: 0.1rem; }
+.help .examples .in { color: var(--text); }
+.help .examples .comment { color: var(--muted); font-style: italic; }
+.help .examples .num { flex: none; padding-block: 0.1rem; color: var(--muted); }
+.help .examples .failure { margin-left: calc(1.5ch + 0.5rem); padding-block: 0.1rem; }
+
+.help .see {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.help .see .ref { font-size: 0.875rem; }
+
+@media (pointer: coarse) {
+  .help .see .ref { min-height: 2.5rem; padding-inline: 0.7rem; }
+}
+
 /* ---------- Preferences ---------- */
 
 @media (prefers-reduced-motion: reduce) {

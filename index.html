@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)">
 <title>Stream</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b5bdb'/%3E%3Cpath d='M10 9l8 7-8 7' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -17,6 +17,7 @@
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7.5 4.5 4 4.5v13c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2v-13c-3.5 0-6 .5-8 2zM12 6.5v13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -26,7 +27,7 @@
 <header class="bar">
   <h1 class="brand"><span class="brand-mark" aria-hidden="true">&rsaquo;</span>Stream</h1>
   <div class="bar-actions">
-    <button type="button" class="btn" id="help-open" disabled title="Reference (coming soon)">
+    <button type="button" class="btn" id="help-open" title="Reference">
       <svg class="icon" aria-hidden="true"><use href="#i-book"/></svg><span>Reference</span>
     </button>
     <button type="button" class="btn" id="clear" aria-label="Clear and start a new session" title="Clear and start a new session">
@@ -58,7 +59,7 @@
       <div class="field" id="field">
         <span class="prompt" aria-hidden="true">&rsaquo;</span>
         <div class="editor">
-          <div id="edit-mirror" aria-hidden="true" data-placeholder="Type an expression"></div>
+          <div id="edit-mirror" aria-hidden="true" data-placeholder="Type an expression, or ? for help"></div>
           <div id="edit-real" contenteditable="plaintext-only" role="textbox" aria-multiline="true"
                aria-label="Stream expression" aria-describedby="status"
                spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="go"></div>
@@ -76,26 +77,30 @@
 
   <dialog class="pager" id="pager" aria-labelledby="pager-title">
     <header class="pager-head">
+      <button type="button" class="btn icon-only" id="pager-back" aria-label="Back to the previous page" title="Back" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+      </button>
       <div class="pager-titles">
         <h2 id="pager-title"></h2>
         <p class="pager-source" id="pager-source"></p>
       </div>
-      <button type="button" class="btn icon-only" id="pager-close" aria-label="Close stream view">
+      <button type="button" class="btn icon-only" id="pager-close" aria-label="Close" title="Close">
         <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
       </button>
     </header>
     <div class="pager-body" id="pager-body" tabindex="0" autofocus aria-label="Stream items">
       <ol class="items" id="pager-list"></ol>
       <div id="pager-sentinel" aria-hidden="true"></div>
+      <article class="help" id="help-page" hidden></article>
     </div>
-    <footer class="pager-foot">
+    <footer class="pager-foot" id="pager-foot">
       <p id="pager-status" role="status"></p>
       <button type="button" class="btn" id="pager-stop" hidden>Stop</button>
     </footer>
   </dialog>
 </div>
 
-<script type="module" src="main.js?v=2"></script>
+<script type="module" src="main.js?v=3"></script>
 
 </body>
 </html>
