@@ -1,35 +1,68 @@
-import init, { process, get_iter } from "./pkg/stream_wasm.js";
+import init, { process, get_iter, reset } from "./pkg/stream_wasm.js";
 
-let busy = false;
-let currentIterator = null;
+// Longest time one "iter_next" request keeps collecting items before it reports back.
+const BATCH_MS = 40;
 
-self.onmessage = async (e) => {
-  if (e.data.type === "init") {
-    await init(undefined, e.data.memory);
-  } else if (e.data.type === "get_iter") {
-    const { num } = e.data;
-    currentIterator = get_iter(num);
-  } else if (e.data.type === "iter_next") {
-    if (currentIterator) {
-      const result = currentIterator.next();
-      self.postMessage({ iterResult: result });
-    }
-  } else if (e.data.type === "iter_free") {
-    if (currentIterator) {
-      currentIterator.free();
-      currentIterator = null;
-    }
-  } else {
-    const { input } = e.data;
+let iterator = null;
 
-    if (busy) return; // ignore concurrent calls
-    busy = true;
-
-    try {
-      const result = process(input);
-      self.postMessage({ result });
-    } finally {
-      busy = false;
-    }
+function freeIterator() {
+  if (iterator) {
+    iterator.free();
+    iterator = null;
   }
+}
+
+const ops = {
+  async init({ memory }) {
+    await init(undefined, memory);
+  },
+
+  process({ input }) {
+    return process(input);
+  },
+
+  iter_open({ num }) {
+    freeIterator();
+    iterator = get_iter(num);
+  },
+
+  // Produces up to `max` items, or as many as fit in BATCH_MS. Each one is reported as soon as
+  // it exists, because the next may take forever to compute. An error item ends the listing.
+  iter_next({ max }, progress) {
+    if (!iterator) return { done: true };
+    const deadline = performance.now() + BATCH_MS;
+    for (let count = 0; count < max; count++) {
+      const step = iterator.next();
+      if (step.done) return { done: true };
+      progress(step.value);
+      if (step.value.type === "error") return { done: true, failed: true };
+      if (performance.now() >= deadline) break;
+    }
+    return { done: false };
+  },
+
+  iter_close() {
+    freeIterator();
+  },
+
+  // Starts an empty session. The iterator goes first, or it would keep its stream alive.
+  reset() {
+    freeIterator();
+    reset();
+  },
+};
+
+// Requests are handled strictly in the order they arrive, one at a time.
+let queue = Promise.resolve();
+
+self.onmessage = (e) => {
+  const { id, op, ...args } = e.data;
+  queue = queue.then(async () => {
+    try {
+      const value = await ops[op](args, (item) => self.postMessage({ id, item }));
+      self.postMessage({ id, value });
+    } catch (err) {
+      self.postMessage({ id, error: String(err?.message ?? err) });
+    }
+  });
 };
