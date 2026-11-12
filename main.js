@@ -113,8 +113,32 @@ function showFatal(message) {
   runButton.disabled = true;
 }
 
+// The engine needs a cross-origin isolated page. Where the server does not send the headers
+// for that, a service worker adds them, and the page is loaded once more to come under it.
+// Resolves to whether the page is isolated; does not resolve if it is being reloaded.
+async function isolate() {
+  const RETRY = "isolating"; // set while the reload is under way, so that it happens only once
+  if (globalThis.crossOriginIsolated) {
+    sessionStorage.removeItem(RETRY);
+    return true;
+  }
+  if (!navigator.serviceWorker || sessionStorage.getItem(RETRY)) {
+    sessionStorage.removeItem(RETRY);
+    return false;
+  }
+  try {
+    await navigator.serviceWorker.register("./isolate.js");
+    await navigator.serviceWorker.ready;
+  } catch {
+    return false;
+  }
+  sessionStorage.setItem(RETRY, "1");
+  location.reload();
+  return new Promise(() => {});
+}
+
 async function start() {
-  if (!globalThis.crossOriginIsolated) {
+  if (!(await isolate())) {
     throw new Error(
       "This page must be served cross-origin isolated (COOP: same-origin, COEP: require-corp) to run Stream.");
   }
