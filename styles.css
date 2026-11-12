@@ -105,6 +105,11 @@ ul, ol { padding: 0; list-style: none; }
 
 .btn:hover { background: var(--surface-2); color: var(--text); }
 .btn.icon-only { padding: 0; }
+.btn.attention, .btn.attention:hover {
+  border-color: var(--error);
+  background: var(--error-soft);
+  color: var(--error);
+}
 .btn:disabled { opacity: 0.45; cursor: default; background: none; color: var(--muted); }
 
 .wide-only { display: none; }

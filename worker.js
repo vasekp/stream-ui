@@ -62,7 +62,9 @@ self.onmessage = (e) => {
       const value = await ops[op](args, (item) => self.postMessage({ id, item }));
       self.postMessage({ id, value });
     } catch (err) {
-      self.postMessage({ id, error: String(err?.message ?? err) });
+      // The package reports its own failures as plain values. An Error object is a trap or a
+      // stack overflow inside the module: it has aborted and cannot be used any more.
+      self.postMessage({ id, error: String(err?.message ?? err), fatal: err instanceof Error });
     }
   });
 };

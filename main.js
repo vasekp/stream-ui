@@ -79,6 +79,23 @@ let nextCallId = 1;
 const calls = new Map();
 let ready = false;
 let sessionId = 0; // tells results of a dropped session from the current one
+// Set when the module has aborted. Its memory is in an unknown state then, so nothing calls
+// into it any more, not even to validate input, until Clear replaces it.
+let lost = false;
+const LOST_MESSAGE = "Command failed, session lost. Hit Clear to reset.";
+
+function markLost() {
+  lost = true;
+  $("clear").classList.add("attention");
+}
+
+// The text to show for a failed request; notes the loss of the session if that is what happened.
+function failureText(err) {
+  if (!err.fatal) return String(err.message ?? err);
+  if (!lost) console.error("Stream aborted:", err.message);
+  markLost();
+  return LOST_MESSAGE;
+}
 
 // `onItem` receives the partial results that some requests report before they finish.
 function rpc(op, args = {}, onItem) {
@@ -105,9 +122,9 @@ async function start() {
   const engine = await import(instanceId === 0 ? "./pkg/stream_wasm.js" : `./pkg/stream_wasm.js?instance=${instanceId}`);
   const wasm = await engine.default();
   ({ stop, validate } = engine);
-  worker = new Worker("./worker.js?v=3", { type: "module" });
+  worker = new Worker("./worker.js?v=4", { type: "module" });
   worker.onmessage = (e) => {
-    const { id, value, error, item } = e.data;
+    const { id, value, error, fatal, item } = e.data;
     const call = calls.get(id);
     if (!call) return;
     if (item !== undefined) {
@@ -115,7 +132,7 @@ async function start() {
       return;
     }
     calls.delete(id);
-    if (error !== undefined) call.reject(new Error(error));
+    if (error !== undefined) call.reject(Object.assign(new Error(error), { fatal }));
     else call.resolve(value);
   };
   worker.onerror = (e) => showFatal(`Stream stopped working: ${e.message ?? "worker error"}. Reload the page to start again.`);
@@ -138,22 +155,27 @@ async function resetSession() {
   setStatus();
   if (!coarsePointer.matches) editor.focus();
 
-  // The worker answers once whatever it was doing has stopped.
-  const patience = new Promise((resolve) => setTimeout(resolve, RESET_PATIENCE_MS, false));
-  const done = rpc("reset").then(() => true, () => false);
-  if (await Promise.race([done, patience])) {
-    ready = true;
-    return;
+  if (!lost) {
+    // The worker answers once whatever it was doing has stopped.
+    const patience = new Promise((resolve) => setTimeout(resolve, RESET_PATIENCE_MS, false));
+    const done = rpc("reset").then(() => true, () => false);
+    if (await Promise.race([done, patience])) {
+      ready = true;
+      return;
+    }
   }
 
-  // It is stuck in something that cannot be interrupted. A worker killed in mid-evaluation
-  // may leave the shared memory unusable, so the whole instance is replaced. The old memory
-  // stays allocated until the page is reloaded.
+  // The module has aborted, or it is stuck in something that cannot be interrupted. Either
+  // way its memory cannot be trusted (a worker killed in mid-evaluation may leave it locked),
+  // so the whole instance is replaced. The old memory stays allocated until the page is
+  // reloaded.
   worker.terminate();
   for (const call of calls.values()) call.reject(new Error("session cleared"));
   calls.clear();
   iterInflight = null;
   instanceId += 1;
+  lost = false;
+  $("clear").classList.remove("attention");
   try {
     await start();
     updateMirror();
@@ -185,7 +207,7 @@ function updateMirror() {
   const empty = text.trim() === "";
   mirror.toggleAttribute("data-empty", text === "" || text === "\n");
   let range;
-  if (ready && !empty) {
+  if (ready && !lost && !empty) {
     range = validate(text).range;
   }
   if (range) {
@@ -297,6 +319,7 @@ function setBusy(busy) {
 }
 
 function requestStop() {
+  if (lost) return;
   if (evalBusy) {
     stopRequested = true;
     stop();
@@ -322,7 +345,7 @@ async function evaluate(text) {
     if (stopRequested) return { type: "error", text: "interrupted", trace: [] };
     return await rpc("process", { input: text });
   } catch (err) {
-    return { type: "error", text: String(err.message ?? err), trace: [] };
+    return { type: "error", text: failureText(err), trace: [] };
   } finally {
     setBusy(false);
     pagerResume();
@@ -383,12 +406,16 @@ async function run(text) {
     editor.focus();
     return;
   }
+  if (lost) {
+    setStatus(LOST_MESSAGE, true);
+    return;
+  }
 
   const session = sessionId;
   if (!validate(text).valid) {
     // Ask the session for the reason, but keep the input for fixing and the transcript clean.
     const result = await evaluate(text);
-    if (session !== sessionId) return;
+    if (session !== sessionId || lost) return;
     if (!fromEditor) setEditor(text, !coarsePointer.matches);
     setStatus(`Syntax error: ${result.text}`, true);
     return;
@@ -505,6 +532,10 @@ function showPager() {
 
 function openPager(num, text, opener) {
   if (!ready || evalBusy) return;
+  if (lost) {
+    setStatus(LOST_MESSAGE, true);
+    return;
+  }
   if (pager.token) releasePager();
   const token = (pager.token = {});
   pager.num = num;
@@ -519,7 +550,7 @@ function openPager(num, text, opener) {
   rpc("iter_open", { num }).catch((err) => {
     if (pager.token !== token) return;
     pager.finished = true;
-    pager.list.append(el("li", {}, failureNode(String(err.message ?? err))));
+    pager.list.append(el("li", {}, failureNode(failureText(err))));
     pagerStatus("Could not open the stream");
   });
 
@@ -535,6 +566,7 @@ function releasePager() {
   pager.token = null;
   pager.near = false;
   clearTimeout(pager.slowTimer);
+  if (lost) return; // the iterator is gone with the module
   if (iterInflight && !evalBusy) stop();
   rpc("iter_close").catch(() => {});
 }
@@ -605,7 +637,7 @@ function loadMore() {
     if (pager.token !== token) return;
     clearTimeout(pager.slowTimer);
     pager.finished = true;
-    pager.list.append(el("li", {}, failureNode(String(err.message ?? err))));
+    pager.list.append(el("li", {}, failureNode(failureText(err))));
     pagerStatus(`Stopped after ${countText(pager.count)}`);
   });
 }
