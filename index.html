@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)">
 <title>Stream</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b5bdb'/%3E%3Cpath d='M10 9l8 7-8 7' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -40,14 +40,15 @@
   <main class="session">
     <div class="scroller" id="scroller">
       <section class="welcome" id="welcome" aria-labelledby="welcome-title">
-        <h2 id="welcome-title">Lazy streams, big integers and letter arithmetic</h2>
+        <h2 id="welcome-title">New session</h2>
         <p>Type an expression below, or try one of these:</p>
         <ul class="samples" id="samples">
-          <li><button type="button" class="sample" data-run='"Uryyb, jbeyq!" + 13'><code>"Uryyb, jbeyq!" + 13</code><span>Shift letters in the alphabet</span></button></li>
+          <li><button type="button" class="sample" data-run='(1..25):{"Wkh txlfn eurzq ira" - #}'><code>(1..25):{"Wkh txlfn eurzq ira" - #}</code><span>Try every Caesar shift</span></button></li>
           <li><button type="button" class="sample" data-run='"Mississippi".lcase.counts'><code>"Mississippi".lcase.counts</code><span>Count the letters</span></button></li>
-          <li><button type="button" class="sample" data-run='"Wzmaj xdmms" + "key".repeat'><code>"Wzmaj xdmms" + "key".repeat</code><span>Decode with a repeating key</span></button></li>
-          <li><button type="button" class="sample" data-run='primes:{#^2}.first(5)'><code>primes:{#^2}.first(5)</code><span>Squares of the first primes</span></button></li>
-          <li><button type="button" class="sample" data-run='nest{#1+#2}(1,1)'><code>nest{#1+#2}(1,1)</code><span>An endless stream to browse</span></button></li>
+          <li><button type="button" class="sample" data-run='"48 65 6c 6c 6f".split(iswhite):strnum(16):unichr.string'><code>"48 65 6c 6c 6f".split(iswhite):strnum(16):unichr.string</code><span>Decode hex bytes</span></button></li>
+          <li><button type="button" class="sample" data-run='"Every good boy does fine".split(iswhite):first.string'><code>"Every good boy does fine".split(iswhite):first.string</code><span>Read the first letters</span></button></li>
+          <li><button type="button" class="sample" data-run='(2^64-1).factor'><code>(2^64-1).factor</code><span>Prime factors</span></button></li>
+          <li><button type="button" class="sample" data-run='primes.windows(2).select{#[2]-#[1]==2}'><code>primes.windows(2).select{#[2]-#[1]==2}</code><span>Twin primes</span></button></li>
         </ul>
       </section>
       <div class="alert" id="fatal" role="alert" hidden></div>
@@ -70,7 +71,7 @@
       </div>
       <div class="under">
         <p class="status" id="status" role="status"></p>
-        <p class="hint" id="hint"><kbd>Enter</kbd> run <kbd>Shift</kbd>+<kbd>Enter</kbd> new line <kbd>&uarr;</kbd> previous input <kbd>Esc</kbd> stop</p>
+        <p class="hint" id="hint"><span><kbd>Enter</kbd> run</span><span><kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><span><kbd>&uarr;</kbd> previous input</span><span><kbd>Esc</kbd> stop</span></p>
       </div>
     </form>
   </main>
